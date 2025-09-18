@@ -1,0 +1,44 @@
+.program step_generator
+.wrap_target
+  pull
+  set y, 1                  ; y is the counter of number of delays remaining in the OSR
+per_delay:
+  out x, 16                 ; shift 16 bits into the X register from the OSR
+  set pins, 1 [14]          ; high for 15 cycles
+  set pins, 0 [12]          ; low for 13 cycles
+  jmp !x afterdelay         ; if X=0, skip delay entirely
+  jmp x-- delayloop         ; pre-decrement X, then enter loop
+delayloop:
+  nop [29]                  ; 30 cycles
+  jmp x-- delayloop         ; loop while X > 0
+afterdelay:
+  jmp y-- per_delay         ; process next number
+.wrap
+
+% c-sdk {
+// Pack two 16-bit delays into a 32-bit word for the FIFO
+// Each delay is in 30-cycle units (at PIO clock rate)
+static inline uint32_t pack_step_delays(uint16_t delay1, uint16_t delay2) {
+    return ((uint32_t)delay2 << 16) | delay1;
+}
+
+// Calculate delay value from step rate
+// Returns delay in 30-cycle units for the PIO program
+static inline uint16_t calculate_step_delay(float step_rate_hz, float pio_freq_hz) {
+    if (step_rate_hz <= 0.0f) return 0xFFFF; // Maximum delay (stop)
+    
+    // Calculate total cycles between steps
+    float cycles_per_step = pio_freq_hz / step_rate_hz;
+    
+    // Subtract fixed step pulse time (15+13 = 28 cycles)
+    float delay_cycles = cycles_per_step - 28.0f;
+    
+    // Convert to 30-cycle units
+    uint32_t delay_units = (uint32_t)(delay_cycles / 30.0f);
+    
+    // Clamp to 16-bit range
+    if (delay_units > 0xFFFF) delay_units = 0xFFFF;
+    
+    return (uint16_t)delay_units;
+}
+%}
