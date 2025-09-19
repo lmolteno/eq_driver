@@ -8,6 +8,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "telescope_protocol.h"
+#include "bluetooth_control.h"
 
 static const char *TAG = "main";
 
@@ -47,11 +48,20 @@ void app_main(void)
         return;
     }
 
+    // Initialize Bluetooth control
+    ret = bluetooth_control_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize Bluetooth control: %s", esp_err_to_name(ret));
+        return;
+    }
+
     ESP_LOGI(TAG, "ESP32 Telescope Controller initialized successfully");
     printf("\n=== ESP32 Telescope Controller Ready ===\n");
     printf("UART Communication: RX=IO0, TX=IO45\n");
+    printf("Bluetooth Device: %s\n", "Telescope_Controller");
     printf("Automatically requesting status from RP2040 every 5 seconds\n");
-    printf("Status updates will be displayed below:\n\n");
+    printf("Status updates will be displayed below:\n");
+    printf("Bluetooth commands: SET_RA_GEAR, SET_DEC_GEAR, JOG_RA_POS/NEG, JOG_DEC_POS/NEG, SYNC, STATUS\n\n");
 
     // Main application continues to run while protocol task handles communication
     while (1) {
