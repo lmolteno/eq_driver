@@ -43,12 +43,9 @@ static const uint32_t STATUS_INTERVAL_US = 1000000 / STATUS_REPORT_HZ; // 20Hz s
 static void uart_rx_isr(void);
 static bool get_rx_byte(uint8_t* byte);
 static void process_received_bytes(void);
-static void handle_set_velocity(const set_velocity_msg_t* msg);
-static void handle_set_position(const set_position_msg_t* msg);
 static void handle_set_pvt_target(const pvt_target_msg_t* msg);
 static void handle_get_status(void);
 static void handle_emergency_stop(void);
-static void handle_set_correction(const correction_msg_t* msg);
 static void reset_frame_parser(void);
 
 /**
@@ -65,8 +62,8 @@ int protocol_init(void) {
     uart_init(protocol_uart, 115200);
     
     // Set up GPIO pins for UART1
-    gpio_set_function(28, GPIO_FUNC_UART);  // TX (GP28)
-    gpio_set_function(29, GPIO_FUNC_UART);  // RX (GP29)
+    gpio_set_function(24, GPIO_FUNC_UART);  // TX (GP28)
+    gpio_set_function(25, GPIO_FUNC_UART);  // RX (GP29)
     
     // Configure UART parameters
     uart_set_hw_flow(protocol_uart, false, false);  // No hardware flow control
@@ -78,7 +75,7 @@ int protocol_init(void) {
     irq_set_enabled(UART1_IRQ, true);
     uart_set_irq_enables(protocol_uart, true, false);  // RX IRQ only
     
-    printf("Protocol system initialized on UART1 (pins GP28/GP29)\\n");
+    printf("Protocol system initialized on UART1 (pins GP24/GP25)\\n");
 #endif
     
     // Initialize timing
@@ -354,24 +351,6 @@ void send_status_report(void) {
  */
 void handle_received_message(const message_frame_t* frame) {
     switch (frame->msg_id) {
-        case MSG_SET_VELOCITY:
-            if (frame->length == sizeof(set_velocity_msg_t)) {
-                handle_set_velocity((const set_velocity_msg_t*)frame->payload);
-                send_ack(frame->msg_id, RESULT_SUCCESS);
-            } else {
-                send_ack(frame->msg_id, RESULT_INVALID_LEN);
-            }
-            break;
-            
-        case MSG_SET_POSITION:
-            if (frame->length == sizeof(set_position_msg_t)) {
-                handle_set_position((const set_position_msg_t*)frame->payload);
-                send_ack(frame->msg_id, RESULT_SUCCESS);
-            } else {
-                send_ack(frame->msg_id, RESULT_INVALID_LEN);
-            }
-            break;
-            
         case MSG_GET_STATUS:
             if (frame->length == 0) {
                 handle_get_status();
@@ -389,16 +368,6 @@ void handle_received_message(const message_frame_t* frame) {
                 send_ack(frame->msg_id, RESULT_INVALID_LEN);
             }
             break;
-            
-        case MSG_SET_CORRECTION:
-            if (frame->length == sizeof(correction_msg_t)) {
-                handle_set_correction((const correction_msg_t*)frame->payload);
-                send_ack(frame->msg_id, RESULT_SUCCESS);
-            } else {
-                send_ack(frame->msg_id, RESULT_INVALID_LEN);
-            }
-            break;
-            
         case MSG_SET_PVT_TARGET:
             if (frame->length == sizeof(pvt_target_msg_t)) {
                 handle_set_pvt_target((const pvt_target_msg_t*)frame->payload);
@@ -418,23 +387,6 @@ void handle_received_message(const message_frame_t* frame) {
 /**
  * Message handlers
  */
-static void handle_set_velocity(const set_velocity_msg_t* msg) {
-    if (!motor_sys) return;
-    
-    printf("Set velocity: RA=%d, DEC=%d\n", (int)msg->ra_velocity, (int)msg->dec_velocity);
-    motor_set_velocity(motor_sys, AXIS_RA, msg->ra_velocity);
-    motor_set_velocity(motor_sys, AXIS_DEC, msg->dec_velocity);
-}
-
-static void handle_set_position(const set_position_msg_t* msg) {
-    if (!motor_sys) return;
-    
-    printf("Set position: RA=%d, DEC=%d, speed=%d\n", 
-           (int)msg->ra_target, (int)msg->dec_target, msg->max_speed);
-    motor_set_position(motor_sys, AXIS_RA, msg->ra_target, msg->max_speed);
-    motor_set_position(motor_sys, AXIS_DEC, msg->dec_target, msg->max_speed);
-}
-
 static void handle_set_pvt_target(const pvt_target_msg_t* msg) {
     if (!motor_sys) return;
     
@@ -459,17 +411,6 @@ static void handle_emergency_stop(void) {
     motor_emergency_stop(motor_sys);
 }
 
-static void handle_set_correction(const correction_msg_t* msg) {
-    if (!motor_sys) return;
-    
-    if (msg->axis >= NUM_AXES) {
-        return;  // Invalid axis
-    }
-    
-    printf("Correction: axis=%d, steps=%d\n", msg->axis, msg->correction);
-    motor_apply_correction(motor_sys, msg->axis, msg->correction);
-}
-
 /**
  * Main protocol task - call this regularly from main loop
  */
@@ -489,7 +430,7 @@ void protocol_task(void) {
     // Send periodic status reports
     absolute_time_t now = get_absolute_time();
     if (absolute_time_diff_us(last_status_time, now) >= STATUS_INTERVAL_US) {
-        // send_status_report();
+        send_status_report();
         last_status_time = now;
     }
 }

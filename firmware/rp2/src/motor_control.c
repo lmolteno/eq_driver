@@ -96,11 +96,6 @@ int motor_system_init(motor_system_t* sys, uint32_t clock_hz) {
         sys->axes[i].velocity = 0;
     }
 
-    sys->axes[AXIS_RA].target_position = 20000;
-    sys->axes[AXIS_RA].target_velocity = -10000;
-    sys->axes[AXIS_RA].target_time = 1000000;
-    sys->axes[AXIS_RA].moving = true;
-
     printf("Motor system initialized with %d axes\n", NUM_AXES);
     return 0;
 }
@@ -462,7 +457,7 @@ void motor_update_task(motor_system_t* sys) {
 
             motor_set_velocity(g_motor_system, i, new_vel);
 
-            printf("Setpoint is %f (%d steps/s for %f seconds from %d) - position error is %f, velocity error is %d\n\r", target_position, ax->target_velocity, ((double)current_time / 1000000.0), ax->target_position, pos_err, ax->target_velocity - new_vel);
+            // printf("Setpoint is %f (%d steps/s for %f seconds from %d) - position error is %f, velocity error is %d\n\r", target_position, ax->target_velocity, ((double)current_time / 1000000.0), ax->target_position, pos_err, ax->target_velocity - new_vel);
 
             previous_error[i] = pos_err;
             previous_update_time[i] = current_time;

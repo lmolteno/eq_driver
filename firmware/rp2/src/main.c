@@ -66,13 +66,6 @@ int main() {
         // Small delay to prevent busy-waiting
         // sleep_us(1000);
         tight_loop_contents();
-
-        if (get_absolute_time() > 8000000 && !updated_pvt)
-        {
-            // after 20 seconds
-            motor_set_pvt_target(&motor_system, 0, -2000, 1000, 8000000);
-            updated_pvt = true;
-        }
     }
     
     return 0;

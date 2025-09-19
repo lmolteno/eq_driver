@@ -4,25 +4,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "motor_control.h"
-
-// Communication interface selection
-// #define USE_USB_CDC         1   // 1 = USB CDC, 0 = UART0
-#define USE_USB_CDC      0   // Uncomment and set to 0 for UART mode
-
 // Protocol constants
 #define START_BYTE          0xAA
 #define MAX_PAYLOAD_SIZE    64
-#define UART_BUFFER_SIZE    256
+#define PROTOCOL_BUFFER_SIZE    256
 #define ACK_TIMEOUT_MS      50
 #define STATUS_REPORT_HZ    20
 
 // Message IDs - ESP32 → RP2040 Commands
-// #define MSG_SET_VELOCITY    0x01
-// #define MSG_SET_POSITION    0x02
 #define MSG_GET_STATUS      0x03
 #define MSG_EMERGENCY_STOP  0x04
-// #define MSG_SET_CORRECTION  0x05
 #define MSG_SET_PVT_TARGET  0x06  // Position/Velocity/Time target
 
 // Message IDs - RP2040 → ESP32 Responses
@@ -84,14 +75,22 @@ typedef struct {
 } __attribute__((packed)) ack_msg_t;
 
 // Function prototypes
-int protocol_init(void);
-void protocol_task(void);
-void protocol_set_motor_system(motor_system_t* sys);
+esp_err_t protocol_init(void);
+void protocol_task(void *pvParameters);
 uint8_t calculate_checksum(const uint8_t* data, uint8_t length);
 bool validate_message(const message_frame_t* frame);
-void send_message(uint8_t msg_id, const void* payload, uint8_t payload_len);
-void send_ack(uint8_t original_msg_id, uint8_t result);
-void send_status_report(void);
+esp_err_t send_message(uint8_t msg_id, const void* payload, uint8_t payload_len);
+esp_err_t send_get_status(void);
+esp_err_t send_emergency_stop(void);
+esp_err_t send_pvt_target(uint8_t axis, int32_t position, int32_t velocity, uint64_t time);
 void handle_received_message(const message_frame_t* frame);
+
+// Status access functions for calculations
+bool get_latest_status(status_msg_t* status);
+int32_t get_current_ra_position(void);
+int32_t get_current_dec_position(void);
+int32_t get_current_ra_velocity(void);
+int32_t get_current_dec_velocity(void);
+uint8_t get_current_status_flags(void);
 
 #endif // TELESCOPE_PROTOCOL_H
