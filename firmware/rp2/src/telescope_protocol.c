@@ -63,8 +63,8 @@ int protocol_init(void) {
     
     // Set up GPIO pins for UART1
     gpio_set_function(24, GPIO_FUNC_UART);  // TX (GP28)
-    gpio_set_function(25, GPIO_FUNC_UART);  // RX (GP29)
-    
+    gpio_set_function(21, GPIO_FUNC_UART);  // RX (GP29)
+
     // Configure UART parameters
     uart_set_hw_flow(protocol_uart, false, false);  // No hardware flow control
     uart_set_format(protocol_uart, 8, 1, UART_PARITY_NONE);
@@ -73,9 +73,9 @@ int protocol_init(void) {
     // Set up RX interrupt
     irq_set_exclusive_handler(UART1_IRQ, uart_rx_isr);
     irq_set_enabled(UART1_IRQ, true);
-    uart_set_irq_enables(protocol_uart, true, false);  // RX IRQ only
-    
-    printf("Protocol system initialized on UART1 (pins GP24/GP25)\\n");
+    uart_set_irqs_enabled(protocol_uart, true, false);  // RX IRQ only
+
+    printf("Protocol system initialized on UART1 (pins GP24/GP25)\n\r");
 #endif
     
     // Initialize timing

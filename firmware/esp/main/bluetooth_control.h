@@ -7,8 +7,8 @@
 
 // Gear reduction structure
 typedef struct {
-    float ra_gear_ratio;    // Steps per degree for RA axis
-    float dec_gear_ratio;   // Steps per degree for DEC axis
+    float ra_gear_ratio;    // Steps per full rotation (360°) for RA axis
+    float dec_gear_ratio;   // Steps per full rotation (360°) for DEC axis
 } gear_config_t;
 
 // Coordinate offsets for SYNC functionality
@@ -24,6 +24,14 @@ typedef struct {
     uint8_t seconds;
     bool negative;
 } dms_t;
+
+// Tracking modes
+typedef enum {
+    TRACKING_OFF = 0,
+    TRACKING_SIDEREAL = 1,
+    TRACKING_SOLAR = 2,
+    TRACKING_LUNAR = 3
+} tracking_mode_t;
 
 // Bluetooth control functions
 esp_err_t bluetooth_control_init(void);
@@ -52,6 +60,10 @@ esp_err_t jog_ra_positive(void);
 esp_err_t jog_ra_negative(void);
 esp_err_t jog_dec_positive(void);
 esp_err_t jog_dec_negative(void);
+
+// Tracking functions
+esp_err_t set_tracking_mode(tracking_mode_t mode);
+tracking_mode_t get_tracking_mode(void);
 
 // Command processing
 void process_bluetooth_command(const char* command);

@@ -13,10 +13,10 @@
 static const char *TAG = "telescope_protocol";
 
 // UART configuration
-#define UART_NUM            UART_NUM_1
-#define UART_TX_PIN         45
-#define UART_RX_PIN         0
-#define UART_BAUD_RATE      115200
+#define UART_NUM                UART_NUM_1
+#define UART_TX_PIN             45
+#define UART_RX_PIN             0
+#define UART_BAUD_RATE          115200
 #define ESP_UART_BUFFER_SIZE    1024
 
 // Message parsing state
@@ -222,15 +222,16 @@ esp_err_t send_message(uint8_t msg_id, const void* payload, uint8_t payload_len)
         frame.checksum ^= frame.payload[i];
     }
 
-    // Send frame
-    uint8_t* frame_data = (uint8_t*)&frame;
-    int frame_size = 3 + payload_len + 1; // start_byte + msg_id + length + payload + checksum
-
-    int bytes_written = uart_write_bytes(UART_NUM, frame_data, frame_size);
-    if (bytes_written != frame_size) {
-        ESP_LOGE(TAG, "Failed to send complete frame: %d/%d bytes", bytes_written, frame_size);
-        return ESP_FAIL;
-    }
+    uart_write_bytes(UART_NUM, &frame.start_byte, 1);
+    uart_write_bytes(UART_NUM, &frame.msg_id, 1);
+    uart_write_bytes(UART_NUM, &frame.length, 1);
+    uart_write_bytes(UART_NUM, frame.payload, payload_len);
+    uart_write_bytes(UART_NUM, &frame.checksum, 1);
+    // int bytes_written = uart_write_bytes(UART_NUM, frame_data, frame_size);
+    // if (bytes_written != frame_size) {
+    //     ESP_LOGE(TAG, "Failed to send complete frame: %d/%d bytes", bytes_written, frame_size);
+    //     return ESP_FAIL;
+    // }
 
     ESP_LOGD(TAG, "Sent message ID 0x%02X, %d bytes", msg_id, payload_len);
     return ESP_OK;
@@ -382,22 +383,14 @@ static void print_current_status(void) {
 void protocol_task(void *pvParameters) {
     ESP_LOGI(TAG, "Protocol task started");
 
-    TickType_t last_status_request = 0;
     TickType_t last_status_print = 0;
-    const TickType_t status_request_interval = pdMS_TO_TICKS(5000); // Request status every 5 seconds
-    const TickType_t status_print_interval = pdMS_TO_TICKS(1000);   // Print status every 1 second
+    const TickType_t status_print_interval = pdMS_TO_TICKS(5000);   // Print status every 1 second
 
     while (1) {
         // Process any received messages
         process_received_bytes();
 
         TickType_t now = xTaskGetTickCount();
-
-        // Periodically request status
-        if (now - last_status_request >= status_request_interval) {
-            send_get_status();
-            last_status_request = now;
-        }
 
         // Periodically print current status
         if (now - last_status_print >= status_print_interval) {

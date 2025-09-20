@@ -48,8 +48,8 @@ int main() {
     // Link motor system to protocol handler
     protocol_set_motor_system(&motor_system);
     
-    printf("System initialized successfully!\\n");
-    printf("Waiting for ESP32 commands...\\n");
+    printf("System initialized successfully!\n");
+    printf("Waiting for ESP32 commands...\n");
     
     // Main control loop
     absolute_time_t last_update = get_absolute_time();
@@ -64,8 +64,8 @@ int main() {
         motor_update_task(&motor_system);
 
         // Small delay to prevent busy-waiting
-        // sleep_us(1000);
-        tight_loop_contents();
+        sleep_us(1000);
+        // tight_loop_contents();
     }
     
     return 0;
