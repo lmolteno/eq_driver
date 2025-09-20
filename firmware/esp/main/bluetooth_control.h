@@ -61,6 +61,10 @@ esp_err_t jog_ra_negative(void);
 esp_err_t jog_dec_positive(void);
 esp_err_t jog_dec_negative(void);
 
+// Step target position functions
+esp_err_t set_ra_step_target(int32_t target_position);
+esp_err_t set_dec_step_target(int32_t target_position);
+
 // Tracking functions
 esp_err_t set_tracking_mode(tracking_mode_t mode);
 tracking_mode_t get_tracking_mode(void);

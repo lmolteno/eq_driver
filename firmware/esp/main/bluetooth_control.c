@@ -33,6 +33,7 @@ static const char *TAG = "bluetooth_control";
 #define CHAR_STATUS_UUID              0xFF04  // Status info (read/notify)
 #define CHAR_SYNC_UUID                0xFF05  // Sync command (write byte: 1=sync)
 #define CHAR_TRACKING_MODE_UUID       0xFF06  // Tracking mode (read/write byte: 0=off, 1=sidereal, 2=solar, 3=lunar)
+#define CHAR_STEP_TARGET_UUID         0xFF07  // Step target position (write: axis byte + int32 position)
 
 // GATT server configuration
 #define GATTS_NUM_HANDLE             20
@@ -74,6 +75,7 @@ static uint16_t jog_control_char_handle;
 static uint16_t status_char_handle;
 static uint16_t sync_char_handle;
 static uint16_t tracking_mode_char_handle;
+static uint16_t step_target_char_handle;
 
 // Advertising configuration
 static uint8_t adv_config_done = 0;
@@ -428,6 +430,17 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt_i
                                    NULL, NULL);
         } else if (param->add_char.char_uuid.uuid.uuid16 == CHAR_TRACKING_MODE_UUID) {
             tracking_mode_char_handle = param->add_char.attr_handle;
+            // Add step target characteristic
+            esp_bt_uuid_t step_target_uuid = {
+                .len = ESP_UUID_LEN_16,
+                .uuid = {.uuid16 = CHAR_STEP_TARGET_UUID}
+            };
+            esp_ble_gatts_add_char(service_handle, &step_target_uuid,
+                                   ESP_GATT_PERM_WRITE,
+                                   ESP_GATT_CHAR_PROP_BIT_WRITE,
+                                   NULL, NULL);
+        } else if (param->add_char.char_uuid.uuid.uuid16 == CHAR_STEP_TARGET_UUID) {
+            step_target_char_handle = param->add_char.attr_handle;
             ESP_LOGI(TAG, "All characteristics added successfully");
         }
         break;
@@ -455,8 +468,8 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt_i
             struct {
                 float ra_degrees;
                 float dec_degrees;
-                int32_t ra_velocity;  // steps per second
-                int32_t dec_velocity; // steps per second
+                float ra_velocity;    // steps per second
+                float dec_velocity;   // steps per second
                 uint8_t tracking_mode;
                 uint8_t status_flags;
             } __attribute__((packed)) status_data;
@@ -581,6 +594,21 @@ static void handle_char_write(uint16_t handle, uint8_t *value, uint16_t len) {
             ESP_LOGI(TAG, "Tracking mode updated to %d", new_mode);
         } else {
             ESP_LOGW(TAG, "Invalid tracking mode: %d", new_mode);
+        }
+    } else if (handle == step_target_char_handle && len == 5) {
+        // Format: 1 byte axis (0=RA, 1=DEC) + 4 bytes int32 position
+        uint8_t axis = value[0];
+        int32_t target_position;
+        memcpy(&target_position, &value[1], sizeof(int32_t));
+
+        if (axis == 0) {
+            set_ra_step_target(target_position);
+            ESP_LOGI(TAG, "RA step target set to %ld", target_position);
+        } else if (axis == 1) {
+            set_dec_step_target(target_position);
+            ESP_LOGI(TAG, "DEC step target set to %ld", target_position);
+        } else {
+            ESP_LOGW(TAG, "Invalid axis for step target: %d", axis);
         }
     }
 }
@@ -837,6 +865,46 @@ esp_err_t jog_dec_negative(void) {
 }
 
 /**
+ * Set RA step target position (debugging function - disables tracking)
+ */
+esp_err_t set_ra_step_target(int32_t target_position) {
+    // Turn off tracking for debugging
+    set_tracking_mode(TRACKING_OFF);
+
+    status_msg_t status;
+    if (!get_latest_status(&status)) {
+        ESP_LOGE(TAG, "Failed to get current status for RA step target");
+        return ESP_FAIL;
+    }
+
+    // Use current time + small offset
+    uint64_t target_time = status.ra_update_time; // 100ms from last update
+
+    // Send PVT target with specified position, zero velocity, and current time
+    return send_pvt_target(0, target_position, 0.0f, target_time);
+}
+
+/**
+ * Set DEC step target position (debugging function - disables tracking)
+ */
+esp_err_t set_dec_step_target(int32_t target_position) {
+    // Turn off tracking for debugging
+    set_tracking_mode(TRACKING_OFF);
+
+    status_msg_t status;
+    if (!get_latest_status(&status)) {
+        ESP_LOGE(TAG, "Failed to get current status for DEC step target");
+        return ESP_FAIL;
+    }
+
+    // Use current time + small offset
+    uint64_t target_time = status.dec_update_time; // 100ms from last update
+
+    // Send PVT target with specified position, zero velocity, and current time
+    return send_pvt_target(1, target_position, 0.0f, target_time);
+}
+
+/**
  * Set tracking mode and update RA tracking velocity
  */
 esp_err_t set_tracking_mode(tracking_mode_t mode) {
@@ -848,14 +916,14 @@ esp_err_t set_tracking_mode(tracking_mode_t mode) {
         return ESP_FAIL;
     }
 
-    int32_t tracking_velocity = 0;
+    float tracking_velocity = 0.0f;
     if (mode != TRACKING_OFF) {
         // Record tracking start time and position for RA coordinate calculation
         tracking_start_time = status.system_time;
         tracking_start_position = status.ra_position;
 
-        tracking_velocity = (int32_t)get_tracking_rate_steps_per_sec(mode);
-        ESP_LOGI(TAG, "Setting tracking velocity to %ld steps/sec", tracking_velocity);
+        tracking_velocity = get_tracking_rate_steps_per_sec(mode);
+        ESP_LOGI(TAG, "Setting tracking velocity to %.1f steps/sec", tracking_velocity);
         ESP_LOGI(TAG, "Tracking started at time %llu, position %ld", tracking_start_time, tracking_start_position);
     } else {
         tracking_start_time = 0;
@@ -892,8 +960,8 @@ static void send_coordinate_report(void) {
 
     snprintf(response, sizeof(response),
         "=== TELESCOPE STATUS ===\n"
-        "RA:  %02d°%02d'%02d\" (steps: %ld, vel: %ld)\n"
-        "DEC: %s%02d°%02d'%02d\" (steps: %ld, vel: %ld)\n"
+        "RA:  %02d°%02d'%02d\" (steps: %ld, vel: %.1f)\n"
+        "DEC: %s%02d°%02d'%02d\" (steps: %ld, vel: %.1f)\n"
         "Gear ratios: RA=%.0f, DEC=%.0f steps/rotation\n"
         "Tracking: %s\n"
         "Status flags: 0x%02X\n"

@@ -51,15 +51,15 @@ typedef struct {
 typedef struct {
     uint8_t axis;          // 0=RA, 1=DEC
     int32_t target_position;  // target step position
-    int32_t target_velocity;  // target velocity (steps/sec)
+    float target_velocity;    // target velocity (steps/sec)
     uint64_t target_time;     // target time (microseconds since boot)
 } __attribute__((packed)) pvt_target_msg_t;
 
 typedef struct {
     int32_t ra_position;   // current step position
     int32_t dec_position;  // current step position
-    int32_t ra_velocity;   // current velocity
-    int32_t dec_velocity;  // current velocity
+    float ra_velocity;     // current velocity
+    float dec_velocity;    // current velocity
     uint64_t ra_update_time;  // last update time for RA axis (microseconds)
     uint64_t dec_update_time; // last update time for DEC axis (microseconds)
     uint64_t system_time;     // current system time (microseconds since boot)
@@ -82,15 +82,15 @@ bool validate_message(const message_frame_t* frame);
 esp_err_t send_message(uint8_t msg_id, const void* payload, uint8_t payload_len);
 esp_err_t send_get_status(void);
 esp_err_t send_emergency_stop(void);
-esp_err_t send_pvt_target(uint8_t axis, int32_t position, int32_t velocity, uint64_t time);
+esp_err_t send_pvt_target(uint8_t axis, int32_t position, float velocity, uint64_t time);
 void handle_received_message(const message_frame_t* frame);
 
 // Status access functions for calculations
 bool get_latest_status(status_msg_t* status);
 int32_t get_current_ra_position(void);
 int32_t get_current_dec_position(void);
-int32_t get_current_ra_velocity(void);
-int32_t get_current_dec_velocity(void);
+float get_current_ra_velocity(void);
+float get_current_dec_velocity(void);
 uint8_t get_current_status_flags(void);
 
 #endif // TELESCOPE_PROTOCOL_H

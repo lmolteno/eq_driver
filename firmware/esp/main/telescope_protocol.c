@@ -256,7 +256,7 @@ esp_err_t send_emergency_stop(void) {
 /**
  * Send PVT target command
  */
-esp_err_t send_pvt_target(uint8_t axis, int32_t position, int32_t velocity, uint64_t time) {
+esp_err_t send_pvt_target(uint8_t axis, int32_t position, float velocity, uint64_t time) {
     pvt_target_msg_t msg = {
         .axis = axis,
         .target_position = position,
@@ -264,7 +264,7 @@ esp_err_t send_pvt_target(uint8_t axis, int32_t position, int32_t velocity, uint
         .target_time = time
     };
 
-    ESP_LOGI(TAG, "Sending PVT target: axis=%d, pos=%ld, vel=%ld, time=%llu",
+    ESP_LOGI(TAG, "Sending PVT target: axis=%d, pos=%ld, vel=%.1f, time=%llu",
              axis, position, velocity, time);
 
     return send_message(MSG_SET_PVT_TARGET, &msg, sizeof(msg));
@@ -366,10 +366,10 @@ static void print_current_status(void) {
 
     printf("\n=== TELESCOPE STATUS (age: %llu ms) ===\n", age_ms);
     printf("System Time: %llu us\n", latest_status.system_time);
-    printf("RA  Position: %ld steps, Velocity: %ld steps/s, Update: %llu us, Current: %u\n",
+    printf("RA  Position: %ld steps, Velocity: %.1f steps/s, Update: %llu us, Current: %u\n",
            latest_status.ra_position, latest_status.ra_velocity,
            latest_status.ra_update_time, latest_status.ra_current);
-    printf("DEC Position: %ld steps, Velocity: %ld steps/s, Update: %llu us, Current: %u\n",
+    printf("DEC Position: %ld steps, Velocity: %.1f steps/s, Update: %llu us, Current: %u\n",
            latest_status.dec_position, latest_status.dec_velocity,
            latest_status.dec_update_time, latest_status.dec_current);
     printf("Status Flags: 0x%02X (%s)\n", latest_status.status_flags,
@@ -422,12 +422,12 @@ int32_t get_current_dec_position(void) {
     return status_received ? latest_status.dec_position : 0;
 }
 
-int32_t get_current_ra_velocity(void) {
-    return status_received ? latest_status.ra_velocity : 0;
+float get_current_ra_velocity(void) {
+    return status_received ? latest_status.ra_velocity : 0.0f;
 }
 
-int32_t get_current_dec_velocity(void) {
-    return status_received ? latest_status.dec_velocity : 0;
+float get_current_dec_velocity(void) {
+    return status_received ? latest_status.dec_velocity : 0.0f;
 }
 
 uint8_t get_current_status_flags(void) {

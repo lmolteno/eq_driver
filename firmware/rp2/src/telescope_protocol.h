@@ -60,15 +60,15 @@ typedef struct {
 typedef struct {
     uint8_t axis;          // 0=RA, 1=DEC
     int32_t target_position;  // target step position
-    int32_t target_velocity;  // target velocity (steps/sec)
+    float target_velocity;    // target velocity (steps/sec)
     uint64_t target_time;     // target time (microseconds since boot)
 } __attribute__((packed)) pvt_target_msg_t;
 
 typedef struct {
     int32_t ra_position;   // current step position
     int32_t dec_position;  // current step position
-    int32_t ra_velocity;   // current velocity
-    int32_t dec_velocity;  // current velocity
+    float ra_velocity;     // current velocity
+    float dec_velocity;    // current velocity
     uint64_t ra_update_time;  // last update time for RA axis (microseconds)
     uint64_t dec_update_time; // last update time for DEC axis (microseconds)
     uint64_t system_time;     // current system time (microseconds since boot)
