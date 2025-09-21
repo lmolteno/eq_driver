@@ -151,8 +151,9 @@ static float get_tracking_rate_steps_per_sec(tracking_mode_t mode) {
     // Convert arcseconds per second to steps per second
     // 1 degree = 3600 arcseconds, 1 rotation = 360 degrees = 1,296,000 arcseconds
     // So: steps_per_sec = (arcsec_per_sec / 1,296,000) * steps_per_rotation
+    // NOTE: Return negative value because tracking decreases step count
     float arcsec_per_rotation = 360.0f * 3600.0f; // 1,296,000 arcseconds per rotation
-    return (arcsec_per_sec / arcsec_per_rotation) * current_gear_config.ra_gear_ratio;
+    return -((arcsec_per_sec / arcsec_per_rotation) * current_gear_config.ra_gear_ratio);
 }
 
 
@@ -726,7 +727,8 @@ void steps_to_ra_dms(int32_t steps, dms_t* dms) {
 
     // Convert steps to degrees (RA is 0-360 degrees)
     // gear_ratio is now steps per full rotation (360 degrees)
-    float degrees = (float)adjusted_steps * 360.0f / current_gear_config.ra_gear_ratio;
+    // NOTE: Invert steps because decreasing steps = increasing RA
+    float degrees = (float)(-adjusted_steps) * 360.0f / current_gear_config.ra_gear_ratio;
 
     // Normalize to 0-360 range
     while (degrees < 0) degrees += 360.0f;
@@ -767,7 +769,8 @@ void steps_to_dec_dms(int32_t steps, dms_t* dms) {
  */
 int32_t ra_dms_to_steps(const dms_t* dms) {
     float degrees = dms->degrees + (dms->minutes / 60.0f) + (dms->seconds / 3600.0f);
-    int32_t steps = (int32_t)(degrees * current_gear_config.ra_gear_ratio / 360.0f);
+    // NOTE: Invert steps because decreasing steps = increasing RA
+    int32_t steps = (int32_t)(-(degrees * current_gear_config.ra_gear_ratio / 360.0f));
     return steps + coord_offsets.ra_offset_steps;
 }
 
@@ -822,7 +825,8 @@ esp_err_t jog_ra_positive(void) {
         return ESP_FAIL;
     }
 
-    int32_t target_pos = status.ra_position + JOG_STEP_SIZE;
+    // NOTE: RA positive means decreasing step count (inverted)
+    int32_t target_pos = status.ra_position - JOG_STEP_SIZE;
     uint64_t target_time = status.ra_update_time + 100000; // 100ms from last update
 
     return send_pvt_target(0, target_pos, get_tracking_rate_steps_per_sec(current_tracking_mode), target_time);
@@ -834,7 +838,8 @@ esp_err_t jog_ra_negative(void) {
         return ESP_FAIL;
     }
 
-    int32_t target_pos = status.ra_position - JOG_STEP_SIZE;
+    // NOTE: RA negative means increasing step count (inverted)
+    int32_t target_pos = status.ra_position + JOG_STEP_SIZE;
     uint64_t target_time = status.ra_update_time + 100000; // 100ms from last update
 
     return send_pvt_target(0, target_pos, get_tracking_rate_steps_per_sec(current_tracking_mode), target_time);
